@@ -368,7 +368,6 @@ mark{background:#fff3b0;padding:0 1px;border-radius:2px}
           <div class="sec" style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px">
             <h4 style="margin:0 0 8px;color:#075e54;font-size:13px">Conteúdo (texto e imagem)</h4>
             <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waGraf" checked onchange="gerarWhats()"> Imagem: incluir gráfico pago × programado</label>
-            <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waUrg" checked onchange="gerarWhats()"> Texto: incluir lista de urgentes</label>
             <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waReag" checked onchange="gerarWhats()"> Incluir reagendados por data</label>
             <p class="muted" style="font-size:11px;margin:8px 0 0">A imagem usa o dia/aba e os filtros selecionados no painel.</p>
           </div>
@@ -553,7 +552,7 @@ function renderBigs(rows){
   const uA=I.urg.filter(isUrg), uP=I.urg.filter(isPagoUrg), rD=I.reag.filter(r=>r.reag).length;
   const cCor=I.pct===null?'#667085':I.pct>=100?'#15966a':I.pct>=50?'#d98a12':'#d43d3a';
   const B=[
-    ['hoje',`📅 A pagar ${nomeDia(I.D)==='hoje'?'hoje':'em '+nomeDia(I.D)}`,brl(sum(I.hoje)),`Em aberto com pagamento em ${fmtD(I.D)}`,I.hoje,'#d98a12'],
+    ['hoje',`📅 A pagar ${nomeDia(I.D)==='hoje'?'hoje':'em '+nomeDia(I.D)}`,brl(sum(I.progDia)),`Programado p/ ${fmtD(I.D).slice(0,5)} · pago ${brl(sum(I.progDia.filter(isPago)))} · reag. ${brl(sum(I.progDia.filter(isReag)))} · aberto ${brl(sum(I.progDia.filter(r=>!isPago(r)&&!isReag(r))))}`,I.progDia,'#d98a12'],
     ['urg','🚨 Total urgente',brl(sum(I.urg)),`Aberto ${brl(sum(uA))} (${uA.length}) · pago ${brl(sum(uP))} (${uP.length})`,I.urg,'#d43d3a'],
     ['reag','🔄 Total reagendado',brl(sum(I.reag)),`${rD} com nova data · ${I.reag.length-rD} sem data`,I.reag,'#7257c9'],
     ['pago','✅ Total pago',brl(sum(I.pago)),`Pagos no período · ${brl(sum(I.pagoDia))} programados p/ ${fmtD(I.D).slice(0,5)}`,I.pago,'#15966a'],
@@ -636,7 +635,7 @@ function detalheDef(id){
   const reagPara={lab:'Reagendado para',fn:r=>r.reag?fmtD(r.reag):'Sem data'};
   const jRe=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja);
   const D={
-    hoje:{t:`📅 A pagar ${nomeDia(I.D)==='hoje'?'hoje':'em '+fmtD(I.D)}`,rows:I.hoje,extra:{lab:'Pagar em',fn:r=>fmtD(edata(r))},desc:`Lançamentos não pagos cuja data de pagamento (data programada, ou a nova data quando reagendado) é ${fmtD(I.D)}.`},
+    hoje:{t:`📅 A pagar ${nomeDia(I.D)==='hoje'?'hoje':'em '+fmtD(I.D)}`,rows:I.progDia,extra:{lab:'Pagar em',fn:r=>fmtD(edata(r))},desc:`Todos os lançamentos programados para ${fmtD(I.D)}: pagos + reagendados + em aberto.`},
     urg:{t:'🚨 Total urgente (aberto + pago)',rows:I.urg,extra:{lab:'Status',fn:r=>isPago(r)?'✅ Pago':'🚨 Em aberto'},desc:'Lançamentos urgentes em aberto (situação URGENTE) e urgentes já pagos. Clique numa loja do ranking para filtrar a lista.',memo:memoLojas(I.urg)},
     reag:{t:'🔄 Total reagendado',rows:I.reag,extra:reagPara,desc:'Lançamentos com situação REAGENDADO (não pagos). Clique numa loja do ranking para abrir o detalhe dela.',memo:memoLojas(I.reag,'Lojas que mais reagendamos',{cor:'#7257c9',bg:'#f8f6fe',borda:'#d9d0f5',rot:'Reagendado para',st:r=>r.reag?`<b style="color:#7257c9">${fmtD(r.reag)}</b>`:'<span class="muted">Sem data</span>',unid:'reagendamentos'})},
     pago:{t:'✅ Total pago',rows:I.pago,desc:'Lançamentos pagos no período (inclui pago urgente e pago/reagendamento).'},
@@ -1194,7 +1193,7 @@ async function gerarWhats(){
   const lond = diaSel==='SEMANA' ? DIAS_SEMANA.filter(d=>DATA.some(r=>r.prog===d)).reduce((a,d)=>a+(+LOND[d]||0),0) : (+LOND[diaSel]||0);
   const pct=v=>k.total?(v/k.total*100).toFixed(1).replace('.',',')+'%':'0%';
   const I6=indicadores(rows), sjR=rows.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0), nJR=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja).length;
-  const cards=[[`📅 A pagar ${nomeDia(I6.D)==='hoje'?'hoje':'em '+nomeDia(I6.D)}`,brl(sum(I6.hoje)),`📄 ${I6.hoje.length} lançamentos`,ORANGE],
+  const cards=[[`📅 A pagar ${nomeDia(I6.D)==='hoje'?'hoje':'em '+nomeDia(I6.D)}`,brl(sum(I6.progDia)),`📄 ${I6.progDia.length} lanç. · pago ${brl(sum(I6.progDia.filter(isPago)))} · reag. ${brl(sum(I6.progDia.filter(isReag)))}`,ORANGE],
     ['🚨 Total urgente',brl(sum(I6.urg)),`📄 ${I6.urg.length} lanç. · aberto ${brl(sum(I6.urg.filter(isUrg)))}`,RED],
     ['🔄 Total reagendado',brl(sum(I6.reag)),`📄 ${I6.reag.length} lançamentos`,PURPLE],
     ['✅ Total pago',brl(sum(I6.pago)),`📄 ${I6.pago.length} lançamentos`,GREEN],
@@ -1260,48 +1259,34 @@ async function compartilharWhats(){
   }catch(e){ if(e.name!=='AbortError') toast('Não foi possível compartilhar: '+esc(e.message)); }
 }
 function resumoTexto(){
-  const rows=filtered(), k=kpis(rows), I=indicadores(rows), L='━━━━━━━━━━━━━━━';
-  const n=a=>`${a.length} lanç.`, pc=(v,t)=>t?(v/t*100).toFixed(1).replace('.',',')+'%':'0%';
-  const incU=document.getElementById('waUrg')?.checked!==false, incR=document.getElementById('waReag')?.checked!==false;
+  // resumo do DIA: aba do dia selecionada, ou a data de referência quando a aba for a semana
+  const D=diaRef(), L='━━━━━━━━━━━━━━━';
+  const dia=DATA.filter(filtroBase).filter(r=>r.prog===D);
+  const pago=dia.filter(isPago), urg=dia.filter(r=>isUrg(r)||isPagoUrg(r)), reag=dia.filter(isReag);
+  const I=indicadores(filtered());
+  const incR=document.getElementById('waReag')?.checked!==false;
   const t=[];
   t.push('📊 *PAINEL FINANCEIRO — CONTAS A PAGAR*','_Grupo Ragga_','');
-  t.push(`📆 *${diaSel==='SEMANA'?'Semana '+semanaTxt():diaNome(diaSel)+' '+fmtD(diaSel)}*`);
-  t.push(`🕐 Atualizado em ${new Date().toLocaleString('pt-BR').slice(0,17)}`);
-  const fa=filtrosAtivos(); if(fa.length) t.push(`🔎 _Filtros: ${fa.join(' · ')}_`);
-  t.push(L,'💰 *VISÃO GERAL*');
-  t.push(`▫️ Programado: *${brl(k.total)}* (${k.qtd} lanç.)`);
-  t.push(`✅ Pago: *${brl(k.pago)}* (${k.qPago}) — ${pc(k.pago,k.total)}`);
-  t.push(`⏳ Falta pagar: *${brl(k.total-k.pago)}*`);
-  t.push(L,`📌 *INDICADORES DO DIA ${fmtD(I.D).slice(0,5)}*`);
-  t.push(`📅 A pagar: *${brl(sum(I.hoje))}* (${n(I.hoje)})`);
+  const fa=filtrosAtivos(); if(fa.length) t.push(`🔎 _Filtros: ${fa.join(' · ')}_`,'');
+  t.push(`📌 *INDICADORES DO DIA ${fmtD(D).slice(0,5)}*`);
+  t.push(`📅 Total a pagar: *${brl(sum(dia))}* (${dia.length} lanç.)`);
+  t.push(`✅ Total pago: *${brl(sum(pago))}* (${pago.length} lanç.)`);
+  const tp=sum(pago), pl={};
+  pago.forEach(r=>{const p=r.plano||'(sem plano)'; pl[p]=pl[p]||{n:0,v:0}; pl[p].n++; pl[p].v+=r.valor;});
+  Object.entries(pl).sort((a,b)=>b[1].v-a[1].v).forEach(([p,o])=>t.push(`      ▫️ ${p}: *${brl(o.v)}* (${o.n}) · ${(tp?o.v/tp*100:0).toFixed(1).replace('.',',')}%`));
   t.push(`⚖️ Conciliação a pagar × pago: *${pctBR(I.pct)}*`);
-  t.push(`🚨 Urgentes: *${brl(sum(I.urg))}* (${n(I.urg)})`);
-  t.push(`      🔴 em aberto ${brl(sum(I.urg.filter(isUrg)))} · 🟢 pagos ${brl(sum(I.urg.filter(isPagoUrg)))}`);
-  t.push(`🔄 Reagendados: *${brl(sum(I.reag))}* (${n(I.reag)})`);
-  const sjR=rows.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0);
-  if(sjR||k.jGer) t.push(`💸 Juros: interno ${brl(sjR)} · gerentes ${brl(k.jGer)}`);
-  const conf=renderConfronto().filter(x=>x.l||x.p);
-  if(conf.length){
-    t.push(L,'🏦 *LONDRINO D+7 × PROGRAMADO*');
-    let tl=0,tq=0;
-    conf.forEach(x=>{ const d=x.liq-x.l; tl+=x.l; tq+=x.liq;
-      t.push(`${x.d===diaSel?'👉':'▫️'} *${diaNome(x.d)} ${fmtD(x.d).slice(0,5)}* — Lond. ${brl(x.l)} | Prog. ${brl(x.liq)} | ${d>0?'🔺':'🔻'} ${brl(d)}`); });
-    t.push(`🧾 *Total:* Lond. ${brl(tl)} | Prog. ${brl(tq)} | ${tq-tl>0?'🔺':'🔻'} *${brl(tq-tl)}*`);
-  }
-  const ua=rows.filter(isUrg).sort((a,b)=>b.valor-a.valor);
-  if(incU&&ua.length){
-    t.push(L,`🚨 *URGENTES EM ABERTO* (${ua.length})`);
-    const nums=['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-    ua.slice(0,10).forEach((r,i)=>t.push(`${nums[i]} ${r.forn} — _${r.cc||'sem CC'}_ · *${brl(r.valor)}*`));
-    if(ua.length>10) t.push(`➕ mais ${ua.length-10} urgentes (${brl(sum(ua.slice(10)))})`);
-  }
-  const rm={}; rows.filter(isReag).forEach(r=>{const x=r.reag||'SEM'; rm[x]=rm[x]||{n:0,v:0}; rm[x].n++; rm[x].v+=r.valor;});
+  t.push(`🚨 Urgentes: *${brl(sum(urg))}* (${urg.length} lanç.)`);
+  t.push(`      🔴 em aberto ${brl(sum(urg.filter(isUrg)))} · 🟢 pagos ${brl(sum(urg.filter(isPagoUrg)))}`);
+  t.push(`🔄 Reagendados: *${brl(sum(reag))}* (${reag.length} lanç.)`);
+  const jInt=dia.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0), jGer=dia.reduce((s,r)=>s+(r.jGer||0),0);
+  t.push(`💸 Juros: interno ${brl(jInt)} · gerentes ${brl(jGer)}`);
+  const rm={}; reag.forEach(r=>{const x=r.reag||'SEM'; rm[x]=rm[x]||{n:0,v:0}; rm[x].n++; rm[x].v+=r.valor;});
   const rk=Object.keys(rm).sort((a,b)=>a==='SEM'?1:b==='SEM'?-1:a.localeCompare(b));
   if(incR&&rk.length){
     t.push(L,'🔄 *REAGENDADOS — PARA QUANDO*');
     rk.forEach(x=>t.push(`▫️ ${x==='SEM'?'Sem data':fmtD(x)}: *${brl(rm[x].v)}* (${rm[x].n})`));
   }
-  t.push(L,'🔗 painel-financeirocontasapagar-hzl6.vercel.app');
+  t.push(L,'','🔗 painel-financeirocontasapagar-hzl6.vercel.app');
   return t.join('\n');
 }
 function atualizarWaTxt(){ const el=document.getElementById('waTxt'); if(el) el.value=resumoTexto(); }
