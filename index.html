@@ -541,7 +541,7 @@ function indicadores(rows){
   const progDia=rows.filter(r=>r.prog===D);
   const reagSaiu=progDia.filter(r=>isReag(r)&&r.reag!==D);
   const reagEntrou=rows.filter(r=>isReag(r)&&r.reag===D&&r.prog!==D);
-  const conc=hoje.concat(pagoDia);
+  const conc=progDia;                                                    // base = total a pagar do dia (pago + reagendado + em aberto)
   const tb=sum(conc);
   return {D,hoje,urg,reag,pago,pagoDia,progDia,reagSaiu,reagEntrou,conc,pct:tb>0?sum(pagoDia)/tb*100:null};
 }
@@ -556,7 +556,7 @@ function renderBigs(rows){
     ['urg','🚨 Total urgente',brl(sum(I.urg)),`Aberto ${brl(sum(uA))} (${uA.length}) · pago ${brl(sum(uP))} (${uP.length})`,I.urg,'#d43d3a'],
     ['reag','🔄 Total reagendado',brl(sum(I.reag)),`${rD} com nova data · ${I.reag.length-rD} sem data`,I.reag,'#7257c9'],
     ['pago','✅ Total pago',brl(sum(I.pago)),`Pagos no período · ${brl(sum(I.pagoDia))} programados p/ ${fmtD(I.D).slice(0,5)}`,I.pago,'#15966a'],
-    ['conc','⚖ Conciliação: a pagar × pago',pctBR(I.pct),`Pago ${brl(sum(I.pagoDia))} · a pagar ${brl(sum(I.hoje))} · ${fmtD(I.D).slice(0,5)}`,I.conc,cCor]];
+    ['conc','⚖ Conciliação: a pagar × pago',pctBR(I.pct),`Pago ${brl(sum(I.pagoDia))} ÷ a pagar ${brl(sum(I.progDia))} · ${fmtD(I.D).slice(0,5)}`,I.conc,cCor]];
   document.getElementById('bigs').innerHTML=B.map(([id,l,v,s,rs,c])=>`<button class="big ${id==='urg'&&sum(uA)>0?'alerta':''}" style="--c:${c}" onclick="abrirDetalhe('${id}')" title="Ver lançamentos que compõem o indicador"><span class="bgo">↗</span><div class="bl">${l}</div><div class="bv">${v}</div><div class="bs">${s}</div><div class="bf">📄 ${n(rs)}<span>${id==='conc'?'total '+brl(sum(rs)):''}</span></div></button>`).join('');
 }
 function detalheConf(id){
@@ -611,16 +611,14 @@ function renderPgPlanos(rows){
   el.innerHTML=`<span class="tit">✅ Total pago por<br>plano de contas</span>`+ord.map(o=>`<button class="pgp" style="--c:${corPlano(o.p,planos.indexOf(o.p))}" onclick="abrirDetalhe('pgpl:${encId(o.p)}')" title="Ver pagamentos do plano ${esc(o.p)}"><div class="a">${esc(o.p)} ↗</div><div class="b">${brl(o.v)}</div><div class="d">📄 ${o.n} lanç. · ${(tot?o.v/tot*100:0).toFixed(1).replace('.',',')}% do pago</div><div class="bar"><i style="width:${tot?o.v/tot*100:0}%"></i></div></button>`).join('');
 }
 function memoConciliacao(I){
-  const tp=sum(I.progDia), ts=sum(I.reagSaiu), te=sum(I.reagEntrou), th=sum(I.hoje), tg=sum(I.pagoDia), tb=th+tg;
+  const tb=sum(I.progDia), tg=sum(I.pagoDia), rg=I.progDia.filter(isReag), ab=I.progDia.filter(r=>!isPago(r)&&!isReag(r)), tr=sum(rg), ta=sum(ab);
   return `<div class="memo"><h4>🧮 Memória da conciliação — ${diaNome(I.D)} ${fmtD(I.D)}</h4><table><tbody>
-   <tr><td>Programado para o dia (data programada ${fmtD(I.D)}) · ${I.progDia.length} lanç.</td><td class="num">${brl(tp)}</td></tr>
-   <tr><td>(−) Reagendados para outra data · ${I.reagSaiu.length} lanç.</td><td class="num">${brl(ts)}</td></tr>
-   <tr><td>(+) Reagendados de outros dias para ${fmtD(I.D).slice(0,5)} · ${I.reagEntrou.length} lanç.</td><td class="num">${brl(te)}</td></tr>
-   <tr class="tot"><td>(=) Base a conciliar · ${I.conc.length} lanç.</td><td class="num">${brl(tb)}</td></tr>
+   <tr class="tot"><td>📅 Total a pagar do dia (data programada ${fmtD(I.D)}) · ${I.progDia.length} lanç.</td><td class="num">${brl(tb)}</td></tr>
    <tr><td>✅ Pago · ${I.pagoDia.length} lanç.</td><td class="num" style="color:var(--green);font-weight:800">${brl(tg)}</td></tr>
-   <tr><td>⏳ A pagar (em aberto) · ${I.hoje.length} lanç.</td><td class="num" style="color:#9a5d00;font-weight:800">${brl(th)}</td></tr>
-   <tr class="tot"><td>Conciliado = Pago ÷ Base = ${brl(tg)} ÷ ${brl(tb)}</td><td class="num" style="font-size:15px">${pctBR(I.pct)}</td></tr>
-   <tr><td>Diferença a pagar = Base − Pago</td><td class="num" style="font-weight:800;color:${th>0?'var(--red)':'var(--green)'}">${brl(tb-tg)}</td></tr>
+   <tr><td>🔄 Reagendado para outra data · ${rg.length} lanç.</td><td class="num" style="color:var(--purple);font-weight:800">${brl(tr)}</td></tr>
+   <tr><td>⏳ Em aberto · ${ab.length} lanç.</td><td class="num" style="color:#9a5d00;font-weight:800">${brl(ta)}</td></tr>
+   <tr class="tot"><td>Conciliado = Pago ÷ Total a pagar = ${brl(tg)} ÷ ${brl(tb)}</td><td class="num" style="font-size:15px">${pctBR(I.pct)}</td></tr>
+   <tr><td>Diferença = Total a pagar − Pago</td><td class="num" style="font-weight:800;color:${tb-tg>0.005?'var(--red)':'var(--green)'}">${brl(tb-tg)}</td></tr>
   </tbody></table><p class="muted" style="font-size:11px;margin:8px 0 0">${diaSel==='SEMANA'?'No consolidado da semana a conciliação usa a data de referência; selecione a aba de um dia para conciliar aquele dia.':'Conciliação do dia selecionado na aba.'}</p></div>`;
 }
 let DET=null;
@@ -1197,7 +1195,7 @@ async function gerarWhats(){
     ['🚨 Total urgente',brl(sum(I6.urg)),`📄 ${I6.urg.length} lanç. · aberto ${brl(sum(I6.urg.filter(isUrg)))}`,RED],
     ['🔄 Total reagendado',brl(sum(I6.reag)),`📄 ${I6.reag.length} lançamentos`,PURPLE],
     ['✅ Total pago',brl(sum(I6.pago)),`📄 ${I6.pago.length} lançamentos`,GREEN],
-    ['⚖ Conciliação a pagar × pago',pctBR(I6.pct),`📄 ${I6.conc.length} lanç. · pago ${brl(sum(I6.pagoDia))} · a pagar ${brl(sum(I6.hoje))}`,I6.pct===null?'#667085':I6.pct>=100?GREEN:I6.pct>=50?ORANGE:RED],
+    ['⚖ Conciliação a pagar × pago',pctBR(I6.pct),`📄 ${I6.conc.length} lanç. · pago ${brl(sum(I6.pagoDia))} ÷ a pagar ${brl(sum(I6.progDia))}`,I6.pct===null?'#667085':I6.pct>=100?GREEN:I6.pct>=50?ORANGE:RED],
     ['💸 Juros interno (reagendados)',brl(sjR),`📄 ${nJR} lançamentos`,ORANGE],
     ['💸 Juros gerentes',brl(k.jGer),`📄 ${k.qJGer} lançamentos`,ORANGE],
     ['📊 Valor médio por lançamento',brl(k.medio),`📄 ${k.qtd} lançamentos`,'#0f9aa0']];
