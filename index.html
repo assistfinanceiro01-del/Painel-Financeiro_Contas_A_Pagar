@@ -348,22 +348,33 @@ mark{background:#fff3b0;padding:0 1px;border-radius:2px}
 <input type="file" id="backupInput" accept=".json" hidden>
 <div class="modal-bg" id="waModal" onclick="if(event.target===this)fecharWhats()">
   <div class="modal" style="max-width:980px">
-    <div class="mh" style="background:#075e54"><h3>imagem para whatsapp.</h3><button class="btn" onclick="fecharWhats()">✕ Fechar</button></div>
+    <div class="mh" style="background:#075e54"><h3>resumo para whatsapp.</h3><button class="btn" onclick="fecharWhats()">✕ Fechar</button></div>
     <div class="mb">
+      <div style="border:1px solid #bfe8cc;border-left:6px solid #25d366;border-radius:12px;background:#f3fbf5;padding:12px 14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+          <h4 style="margin:0;color:#075e54;font-size:14px">📝 Resumo em texto <span class="muted" style="font-weight:400;font-size:11px">— pode editar antes de enviar</span></h4>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="bbtn pri" style="margin:0;background:#25d366;border-color:#25d366" onclick="copiarTextoWa()">📋 Copiar texto</button>
+            <button class="bbtn" style="margin:0;background:#075e54;border-color:#075e54;color:#fff" onclick="enviarTextoWa()">💬 Enviar no WhatsApp</button>
+            <button class="bbtn" style="margin:0" onclick="atualizarWaTxt()" title="Refaz o texto com os filtros atuais">↻</button>
+          </div>
+        </div>
+        <textarea id="waTxt" rows="14" spellcheck="false" style="width:100%;box-sizing:border-box;border:1px solid #cfe9d6;border-radius:10px;padding:12px;font:13px/1.5 'Segoe UI',Arial,sans-serif;color:var(--text);background:#fff;resize:vertical"></textarea>
+      </div>
+      <h4 style="margin:0 0 8px;color:#075e54;font-size:14px">🖼 Imagem</h4>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
         <div style="flex:1 1 420px;max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:10px;background:#e5ddd5;padding:10px;text-align:center"><img id="waImg" style="max-width:100%;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.15)" alt="Resumo do painel"></div>
         <div style="flex:0 1 300px">
           <div class="sec" style="border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px">
-            <h4 style="margin:0 0 8px;color:#075e54;font-size:13px">Conteúdo da imagem</h4>
-            <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waGraf" checked onchange="gerarWhats()"> Incluir gráficos</label>
-            <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waUrg" checked onchange="gerarWhats()"> Incluir lista de urgentes</label>
+            <h4 style="margin:0 0 8px;color:#075e54;font-size:13px">Conteúdo (texto e imagem)</h4>
+            <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waGraf" checked onchange="gerarWhats()"> Imagem: incluir gráfico pago × programado</label>
+            <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waUrg" checked onchange="gerarWhats()"> Texto: incluir lista de urgentes</label>
             <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;color:var(--text);font-weight:400"><input type="checkbox" id="waReag" checked onchange="gerarWhats()"> Incluir reagendados por data</label>
             <p class="muted" style="font-size:11px;margin:8px 0 0">A imagem usa o dia/aba e os filtros selecionados no painel.</p>
           </div>
           <button class="bbtn pri" style="width:100%;background:#25d366;border-color:#25d366" onclick="copiarWhats()">📋 Copiar imagem</button>
           <button class="bbtn" style="width:100%" onclick="compartilharWhats()">📤 Compartilhar (WhatsApp do PC/celular)</button>
           <button class="bbtn" style="width:100%" onclick="baixarWhats()">⬇ Baixar imagem (PNG)</button>
-          <button class="bbtn" style="width:100%" onclick="abrirWaWeb()">💬 Abrir WhatsApp Web com resumo</button>
           <p class="muted" style="font-size:11px;margin-top:8px"><b>Como enviar:</b> clique em <b>Copiar imagem</b>, abra a conversa no WhatsApp (Web ou Desktop) e aperte <b>Ctrl+V</b>. Ou baixe o PNG e anexe.</p>
         </div>
       </div>
@@ -1150,19 +1161,19 @@ function filtrosAtivos(){
 function rrect(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath(); }
 function fit(c,txt,w){ txt=String(txt??''); if(c.measureText(txt).width<=w) return txt; while(txt.length>1&&c.measureText(txt+'…').width>w) txt=txt.slice(0,-1); return txt+'…'; }
 async function gerarWhats(){
+  atualizarWaTxt();
   const rows=filtered(), k=kpis(rows);
   const [leaf,logo]=await Promise.all([loadImg(IMG_LEAF),loadImg(IMG_LOGO)]);
   const W=1080, P=40, S='"Segoe UI",Arial,sans-serif', SERIF='Georgia,"Times New Roman",serif';
   const BR='#0128a9', RED='#d43d3a', GREEN='#15966a', ORANGE='#d98a12', PURPLE='#7257c9', TXT='#172033', MUT='#667085';
-  const incG=document.getElementById('waGraf').checked, incU=document.getElementById('waUrg').checked, incR=document.getElementById('waReag').checked;
+  const incG=document.getElementById('waGraf').checked, incU=false, incR=document.getElementById('waReag').checked; // imagem: cartões + reagendados + gráfico pago × programado
   const urg=rows.filter(isUrgAll).sort((a,b)=>(isPago(a)-isPago(b))||b.valor-a.valor);
   const reagM={}; rows.filter(isReag).forEach(r=>{const x=r.reag||'SEM'; reagM[x]=reagM[x]||{n:0,v:0}; reagM[x].n++; reagM[x].v+=r.valor;});
   const reagK=Object.keys(reagM).sort((a,b)=>a==='SEM'?1:b==='SEM'?-1:a.localeCompare(b));
   const fa=filtrosAtivos();
-  const chartsList=incG?[['chPagoDia','Total pago × total programado'],['chUrgCC','Urgentes por centro de custo'],['chCC','Valor por centro de custo']].filter(([id])=>charts[id]):[];
+  const chartsList=incG?[['chPagoDia','Total pago × total programado']].filter(([id])=>charts[id]):[];
   // altura
   let H=200+(fa.length?40:0)+4*120+30;              // header + kpis
-  H+=70+7*40+34;                                     // confronto
   if(incU&&urg.length) H+=70+Math.min(urg.length,10)*38+(urg.length>10?30:0)+20;
   if(incR&&reagK.length) H+=70+reagK.length*38+20;
   chartsList.forEach(([id])=>{const cv=charts[id].canvas; H+=60+Math.round((W-2*P)*cv.height/cv.width)+30;});
@@ -1201,21 +1212,7 @@ async function gerarWhats(){
   y+=4*(ch+16)+20;
   const secT=(txt,col)=>{ c.fillStyle=col||BR; c.font=`italic 30px ${SERIF}`; c.fillText(txt,P,y+34); y+=56; };
   const boxStart=(h)=>{ c.fillStyle='#fff'; rrect(c,P,y,W-2*P,h,12); c.fill(); c.strokeStyle='#e5e9ef'; c.stroke(); };
-  // confronto
-  secT('Confronto Londrino D+7 × Programado.');
-  const base=DATA.filter(filtroBase);
-  const lin=DIAS_SEMANA.map(d=>{const r=base.filter(x=>x.prog===d); return {d,l:+LOND[d]||0,p:sum(r),pg:sum(r.filter(isPago))};});
-  boxStart(7*40+10);
-  const cols=[P+18,P+250,P+470,P+690,W-P-18];
-  c.font=`700 14px ${S}`; c.fillStyle=MUT; ['DATA','LONDRINO D+7','PROGRAMADO','PAGO','DIFERENÇA'].forEach((h,i)=>{ c.textAlign=i===0?'left':'right'; c.fillText(h,i===0?cols[0]:cols[i]+(i===4?0:100),y+28); });
-  lin.concat([{d:'TOTAL',l:lin.reduce((a,x)=>a+x.l,0),p:lin.reduce((a,x)=>a+x.p,0),pg:lin.reduce((a,x)=>a+x.pg,0)}]).forEach((x,i)=>{ const yy=y+40+(i+1)*40-12;
-    if(x.d===diaSel){ c.fillStyle='#e9edfb'; c.fillRect(P+6,yy-26,W-2*P-12,38); }
-    c.strokeStyle='#eef1f5'; c.beginPath(); c.moveTo(P+12,yy-28); c.lineTo(W-P-12,yy-28); c.stroke();
-    const tot=x.d==='TOTAL'; c.font=`${tot?800:600} 17px ${S}`; c.fillStyle=TXT; c.textAlign='left'; c.fillText(tot?'Semana':`${diaNome(x.d)} ${fmtD(x.d).slice(0,5)}`,cols[0],yy);
-    c.textAlign='right'; c.font=`${tot?800:400} 17px ${S}`; c.fillText(brl(x.l),cols[1]+100,yy); c.fillText(brl(x.p),cols[2]+100,yy); c.fillStyle=GREEN; c.fillText(brl(x.pg),cols[3]+100,yy);
-    const dif=x.p-x.l; c.fillStyle=dif>0?RED:GREEN; c.font=`700 17px ${S}`; c.fillText(brl(dif),cols[4],yy); });
-  c.textAlign='left'; y+=7*40+10+26;
-  // urgentes
+  // urgentes (desativado na imagem)
   if(incU&&urg.length){
     secT(`Urgentes — ${brl(sum(urg))} (${urg.length})`,RED);
     const n=Math.min(urg.length,10), bh=n*38+14+(urg.length>10?30:0); boxStart(bh);
@@ -1263,10 +1260,58 @@ async function compartilharWhats(){
   }catch(e){ if(e.name!=='AbortError') toast('Não foi possível compartilhar: '+esc(e.message)); }
 }
 function resumoTexto(){
-  const k=kpis(filtered());
-  return `*Painel Contas a Pagar — ${periodoLabel()}*\n💰 Programado: ${brl(k.total)} (${k.qtd} lanç.)\n🚨 Total urgente: ${brl(k.urgTot)} (${k.qUrgTot}) — aberto ${brl(k.urg)} · pago ${brl(k.pagoUrg)}\n✅ Pago: ${brl(k.pago)} · Pago urgente: ${brl(k.pagoUrg)}\n📅 Vence hoje: ${brl(k.hoje)}\n🔄 Reagendado: ${brl(k.reag)}`;
+  const rows=filtered(), k=kpis(rows), I=indicadores(rows), L='━━━━━━━━━━━━━━━';
+  const n=a=>`${a.length} lanç.`, pc=(v,t)=>t?(v/t*100).toFixed(1).replace('.',',')+'%':'0%';
+  const incU=document.getElementById('waUrg')?.checked!==false, incR=document.getElementById('waReag')?.checked!==false;
+  const t=[];
+  t.push('📊 *PAINEL FINANCEIRO — CONTAS A PAGAR*','_Grupo Ragga_','');
+  t.push(`📆 *${diaSel==='SEMANA'?'Semana '+semanaTxt():diaNome(diaSel)+' '+fmtD(diaSel)}*`);
+  t.push(`🕐 Atualizado em ${new Date().toLocaleString('pt-BR').slice(0,17)}`);
+  const fa=filtrosAtivos(); if(fa.length) t.push(`🔎 _Filtros: ${fa.join(' · ')}_`);
+  t.push(L,'💰 *VISÃO GERAL*');
+  t.push(`▫️ Programado: *${brl(k.total)}* (${k.qtd} lanç.)`);
+  t.push(`✅ Pago: *${brl(k.pago)}* (${k.qPago}) — ${pc(k.pago,k.total)}`);
+  t.push(`⏳ Falta pagar: *${brl(k.total-k.pago)}*`);
+  t.push(L,`📌 *INDICADORES DO DIA ${fmtD(I.D).slice(0,5)}*`);
+  t.push(`📅 A pagar: *${brl(sum(I.hoje))}* (${n(I.hoje)})`);
+  t.push(`⚖️ Conciliação a pagar × pago: *${pctBR(I.pct)}*`);
+  t.push(`🚨 Urgentes: *${brl(sum(I.urg))}* (${n(I.urg)})`);
+  t.push(`      🔴 em aberto ${brl(sum(I.urg.filter(isUrg)))} · 🟢 pagos ${brl(sum(I.urg.filter(isPagoUrg)))}`);
+  t.push(`🔄 Reagendados: *${brl(sum(I.reag))}* (${n(I.reag)})`);
+  const sjR=rows.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0);
+  if(sjR||k.jGer) t.push(`💸 Juros: interno ${brl(sjR)} · gerentes ${brl(k.jGer)}`);
+  const conf=renderConfronto().filter(x=>x.l||x.p);
+  if(conf.length){
+    t.push(L,'🏦 *LONDRINO D+7 × PROGRAMADO*');
+    let tl=0,tq=0;
+    conf.forEach(x=>{ const d=x.liq-x.l; tl+=x.l; tq+=x.liq;
+      t.push(`${x.d===diaSel?'👉':'▫️'} *${diaNome(x.d)} ${fmtD(x.d).slice(0,5)}* — Lond. ${brl(x.l)} | Prog. ${brl(x.liq)} | ${d>0?'🔺':'🔻'} ${brl(d)}`); });
+    t.push(`🧾 *Total:* Lond. ${brl(tl)} | Prog. ${brl(tq)} | ${tq-tl>0?'🔺':'🔻'} *${brl(tq-tl)}*`);
+  }
+  const ua=rows.filter(isUrg).sort((a,b)=>b.valor-a.valor);
+  if(incU&&ua.length){
+    t.push(L,`🚨 *URGENTES EM ABERTO* (${ua.length})`);
+    const nums=['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+    ua.slice(0,10).forEach((r,i)=>t.push(`${nums[i]} ${r.forn} — _${r.cc||'sem CC'}_ · *${brl(r.valor)}*`));
+    if(ua.length>10) t.push(`➕ mais ${ua.length-10} urgentes (${brl(sum(ua.slice(10)))})`);
+  }
+  const rm={}; rows.filter(isReag).forEach(r=>{const x=r.reag||'SEM'; rm[x]=rm[x]||{n:0,v:0}; rm[x].n++; rm[x].v+=r.valor;});
+  const rk=Object.keys(rm).sort((a,b)=>a==='SEM'?1:b==='SEM'?-1:a.localeCompare(b));
+  if(incR&&rk.length){
+    t.push(L,'🔄 *REAGENDADOS — PARA QUANDO*');
+    rk.forEach(x=>t.push(`▫️ ${x==='SEM'?'Sem data':fmtD(x)}: *${brl(rm[x].v)}* (${rm[x].n})`));
+  }
+  t.push(L,'🔗 painel-financeirocontasapagar-hzl6.vercel.app');
+  return t.join('\n');
 }
-function abrirWaWeb(){ copiarWhats(); window.open('https://web.whatsapp.com/send?text='+encodeURIComponent(resumoTexto()),'_blank'); }
+function atualizarWaTxt(){ const el=document.getElementById('waTxt'); if(el) el.value=resumoTexto(); }
+async function copiarTextoWa(){
+  const el=document.getElementById('waTxt'), txt=el.value;
+  try{ await navigator.clipboard.writeText(txt); }catch(e){ el.select(); document.execCommand('copy'); }
+  toast('📋 Texto copiado! Abra a conversa no WhatsApp e aperte Ctrl+V.',6000);
+}
+function enviarTextoWa(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('waTxt').value),'_blank'); }
+function abrirWaWeb(){ enviarTextoWa(); }
 
 function abrirBackup(){ renderBackup(); document.getElementById('bkModal').style.display='flex'; syncModal(); }
 function fecharBackup(){ document.getElementById('bkModal').style.display='none'; syncModal(); }
