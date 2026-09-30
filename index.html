@@ -425,6 +425,9 @@ function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}ca
 function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
 
 let DATA = lsGet(LS_BASE) || BASE_ORIGINAL.slice();
+// valor considerado nos indicadores = somente a coluna VALOR (juros ficam só nos cards de juros)
+function normValores(arr){ (arr||[]).forEach(r=>{ if(typeof r.vbase==='number') r.valor=Math.round(r.vbase*100)/100; }); return arr; }
+normValores(DATA);
 let LOND = Object.assign({},LONDRINO_PADRAO, lsGet(LS_LOND)||{});
 let INFO = lsGet(LS_INFO) || {fonte:'nenhuma planilha importada ainda — clique em Importar planilha', quando:''};
 let diaSel = 'SEMANA';
@@ -994,7 +997,7 @@ function render(){
   const dias=[...new Set(DATA.map(r=>r.prog))].filter(Boolean).sort().map(d=>fmtD(d).slice(0,5));
   document.getElementById('baseInfo').textContent=`Base: ${INFO.fonte}${INFO.quando?' · importado em '+INFO.quando:''} · ${DATA.length} lançamentos · datas carregadas: ${dias.join(', ')||'—'}`;
   refreshDetalhe();
-  document.getElementById('foot').textContent='Valor considerado: "Valor Total com juros" quando preenchido; senão VALOR + Juros internos loja (coluna Comentários) + Juros dos gerentes (coluna Juros) − Desconto. Indicadores: Urgente, Vence hoje e Reagendado excluem itens já pagos. Pago = STATUS LIBERADO (coluna V); NÃO LIBERADO não entra como pago.';
+  document.getElementById('foot').textContent='Valor considerado: somente a coluna VALOR (sem juros). Juros internos (coluna Comentários) e juros dos gerentes (coluna Juros) aparecem nos cards de juros. Indicadores: Urgente, Vence hoje e Reagendado excluem itens já pagos. Pago = STATUS LIBERADO (coluna V); NÃO LIBERADO não entra como pago.';
 }
 
 /* ============ IMPORTAÇÃO ============ */
@@ -1051,7 +1054,7 @@ function lerPlanilha(wb){
       const jLoja=Math.round(parseNum(g(r,'jLoja'))*100)/100, jGer=Math.round(parseNum(g(r,'juros'))*100)/100, dsc=parseNum(g(r,'desconto'));
       const vt=parseNum(g(r,'valorTot')) || (vBase+jLoja+jGer-dsc);
       out.push({lanc:parseDate(g(r,'lanc')),forn,desc:String(g(r,'desc')||'').trim(),plano:String(g(r,'plano')||'').trim(),pdc:String(g(r,'pdc')||'').trim(),cc:String(g(r,'cc')||'').trim(),
-        prog:parseDate(g(r,'prog')),sit:String(g(r,'sit')||'').trim().toUpperCase(),ok:String(g(r,'ok')||'').trim(),forma:String(g(r,'forma')||'').trim(),valor:Math.round(vt*100)/100,vbase:vBase,jLoja,jGer,dsc,
+        prog:parseDate(g(r,'prog')),sit:String(g(r,'sit')||'').trim().toUpperCase(),ok:String(g(r,'ok')||'').trim(),forma:String(g(r,'forma')||'').trim(),valor:Math.round(vBase*100)/100,vtot:Math.round(vt*100)/100,vbase:vBase,jLoja,jGer,dsc,
         banco:String(g(r,'banco')||'').trim(),status:String(g(r,'status')||'').trim(),motivo:String(g(r,'motivo')||'').trim(),orig:parseDate(g(r,'orig')),reag:parseDate(g(r,'reag')),vorig:parseDate(g(r,'vorig'))});
       n++;
     }
@@ -1364,7 +1367,7 @@ async function carregarServidor(){
     const r=await fetch(API_BASE,{cache:'no-store'}); const j=await r.json().catch(()=>({}));
     if(!r.ok) throw new Error(j.erro||('erro '+r.status));
     if(Array.isArray(j.dados) && j.dados.length){
-      DATA=j.dados; LOND=Object.assign({},LONDRINO_PADRAO,j.londrino||{}); if(j.info) INFO=j.info;
+      DATA=normValores(j.dados); LOND=Object.assign({},LONDRINO_PADRAO,j.londrino||{}); if(j.info) INFO=j.info;
       lsSet(LS_BASE,DATA); lsSet(LS_LOND,LOND); lsSet(LS_INFO,INFO);
       buildFilterOptions(); semanaSel=null; render();
     } else if(DATA.length){
