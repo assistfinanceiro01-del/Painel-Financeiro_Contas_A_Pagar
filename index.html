@@ -439,7 +439,10 @@ function fmtD(s){ if(!s) return ''; const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
 function diaNome(s){ const [y,m,d]=s.split('-').map(Number); return ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][new Date(y,m-1,d).getDay()]; }
 function norm(s){ return String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim(); }
 
-const isPago     = r => r.sit.includes('PAGO');
+// STATUS (coluna V): LIBERADO conta como pago; NÃO LIBERADO nunca conta como pago, mesmo com situação PAGO
+const stNorm     = r => norm(r.status);
+const isNaoLib   = r => stNorm(r).startsWith('NAO LIBERADO');
+const isPago     = r => !isNaoLib(r) && (r.sit.includes('PAGO') || stNorm(r)==='LIBERADO');
 const isUrg      = r => r.sit.includes('URGENTE') && !isPago(r);
 const isHoje     = r => r.sit.includes('VENCE HOJE');
 const isReag     = r => r.sit.includes('REAGEND') && !isPago(r);
@@ -991,7 +994,7 @@ function render(){
   const dias=[...new Set(DATA.map(r=>r.prog))].filter(Boolean).sort().map(d=>fmtD(d).slice(0,5));
   document.getElementById('baseInfo').textContent=`Base: ${INFO.fonte}${INFO.quando?' · importado em '+INFO.quando:''} · ${DATA.length} lançamentos · datas carregadas: ${dias.join(', ')||'—'}`;
   refreshDetalhe();
-  document.getElementById('foot').textContent='Valor considerado: "Valor Total com juros" quando preenchido; senão VALOR + Juros internos loja (coluna Comentários) + Juros dos gerentes (coluna Juros) − Desconto. Indicadores: Urgente, Vence hoje e Reagendado excluem itens já pagos.';
+  document.getElementById('foot').textContent='Valor considerado: "Valor Total com juros" quando preenchido; senão VALOR + Juros internos loja (coluna Comentários) + Juros dos gerentes (coluna Juros) − Desconto. Indicadores: Urgente, Vence hoje e Reagendado excluem itens já pagos. Pago = STATUS LIBERADO (coluna V); NÃO LIBERADO não entra como pago.';
 }
 
 /* ============ IMPORTAÇÃO ============ */
