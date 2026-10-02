@@ -487,7 +487,12 @@ function filtroBase(r){
   return true;
 }
 function diasDisponiveis(){ return DIAS_SEMANA.slice(); }
-function semanasDisponiveis(){ return [...new Set(DATA.map(r=>r.prog).filter(isISO).map(segundaDe))].sort(); }
+// semanas com dados + semana atual + a próxima semana depois da última (para já poder selecionar a semana seguinte)
+function semanasDisponiveis(){
+  const s=new Set(DATA.map(r=>r.prog).filter(isISO).map(segundaDe)); s.add(segundaDe(hojeISO()));
+  const ult=[...s].sort().pop(); s.add(addDias(ult,7));
+  return [...s].sort();
+}
 function semanaPadrao(){ const ws=semanasDisponiveis(), h=segundaDe(REF_DATE); if(!ws.length) return h; if(ws.includes(h)) return h; const ant=ws.filter(w=>w<=h); return ant.length?ant[ant.length-1]:ws[0]; }
 function setSemana(seg){
   semanaSel=seg;
