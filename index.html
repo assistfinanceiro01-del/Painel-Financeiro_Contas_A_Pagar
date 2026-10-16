@@ -302,6 +302,18 @@ mark{background:#fff3b0;padding:0 1px;border-radius:2px}
 
   <div class="box panel">
     <div class="toolbar">
+      <div><h2>Total Pago × Total Programado — Mês</h2><p class="hint" style="margin:0">Mesmo indicador somando o mês inteiro. Barras: programado, pago e pago urgente por semana do mês (a linha mostra o % pago). Clique numa barra para abrir a semana. Respeita os filtros.</p></div>
+      <div style="min-width:240px"><label>📅 Mês</label><select id="fMes"></select></div>
+    </div>
+    <div id="pagoResumoMes" class="pagoResumo"></div>
+    <div class="grid2" style="grid-template-columns:2.4fr 1fr">
+      <div class="chartbox" style="height:230px"><canvas id="chPagoMes"></canvas></div>
+      <div class="chartbox" style="height:230px"><canvas id="chPagoMesPct"></canvas></div>
+    </div>
+  </div>
+
+  <div class="box panel">
+    <div class="toolbar">
       <div><h2>Reagendamentos</h2><p class="hint" style="margin:0">Somente lançamentos com situação REAGENDADO — data programada, data original e para qual data foram reagendados.</p></div>
       <div style="min-width:280px"><label>Reagendado para</label><select id="fReagPara"></select></div>
     </div>
@@ -640,7 +652,8 @@ function detalheDef(id){
   if(id.startsWith('pgpl:')){ const p=decodeURIComponent(id.slice(5)), rs=filtered().filter(isPago), a=rs.filter(r=>(r.plano||'(sem plano)')===p);
     return {id,t:`✅ Total pago — plano ${p}`,rows:a,extra:{lab:'PDC detalhado',fn:r=>esc(r.pdc)},desc:`Pagamentos do plano de contas ${p} no período · ${sum(rs)?(sum(a)/sum(rs)*100).toFixed(1).replace('.',','):0}% do total pago (${brl(sum(rs))}).`,
       memo:memoSitRows(a,'Pago por situação')+memoLojas(a,`Lojas com mais pagamentos em ${p}`,{cor:'#15966a',bg:'#f3fbf7',borda:'#bfe6d4',rot:'Situação',st:r=>esc(r.sit),unid:'pagamentos'})}; }
-  const rows=filtered(), I=indicadores(rows), k=kpis(rows);
+  const pm=id.startsWith('pm_'); if(pm) id='pp_'+id.slice(3);
+  const rows=pm?mesRows():filtered(), I=indicadores(rows), k=kpis(rows);
   const reagPara={lab:'Reagendado para',fn:r=>r.reag?fmtD(r.reag):'Sem data'};
   const jRe=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja);
   const D={
@@ -660,7 +673,9 @@ function detalheDef(id){
     al_urg:{t:'🚨 Urgentes em aberto',rows:rows.filter(isUrg),desc:'Lançamentos com situação URGENTE ainda não pagos.',memo:memoLojas(rows.filter(isUrg),'Lojas com urgentes em aberto')},
     c_medio:{t:'📊 Valor médio por lançamento',rows:rows,desc:`Valor médio = ${brl(k.total)} ÷ ${k.qtd} lançamentos = ${brl(k.medio)}.`}
   };
-  return Object.assign({id},D[id]);
+  const r=Object.assign({id:pm?'pm_'+id.slice(3):id},D[id]);
+  if(pm){ r.t+=` — ${mesNome()}`; r.desc=`Mês de ${mesNome()} (todas as semanas). `+(r.desc||''); }
+  return r;
 }
 function setCaixa(modo,valor){ const c=caixaCfg(); c.modo=modo; if(valor!==undefined) c.valor=parseNum(valor); lsSet(LS_CAIXA,c); render(); }
 function escopoTxt(){ const fa=filtrosAtivos(); return `${periodoLabel()} · dia de referência ${fmtD(diaRef())}${fa.length?' · filtros: '+fa.join(' · '):''}`; }
@@ -916,8 +931,46 @@ function detalheULJ(id){
     escopo:`Consolidado da semana ${semanaTxt()}${fa.length?' · filtros: '+fa.join(' · '):''}`,desc:'Pagamentos urgentes (em aberto + pagos) da semana selecionada.',
     memo:`<div class="memo"><h4>🧮 Por plano de contas</h4><table><tbody>${porPl}<tr><td>🚨 Em aberto · ${list.filter(isUrg).length} lanç.</td><td class="num">${brl(sum(list.filter(isUrg)))}</td></tr><tr><td>✅ Pagos · ${list.filter(isPagoUrg).length} lanç.</td><td class="num">${brl(sum(list.filter(isPagoUrg)))}</td></tr><tr class="tot"><td>Total · ${list.length} lanç.</td><td class="num">${brl(sum(list))}</td></tr></tbody></table></div>`+(cc==='*'?memoLojas(list):'')};
 }
+/* ===== Total pago × programado — MÊS ===== */
+let mesSel=null;
+const MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function mesAtual(){ return mesSel || diaRef().slice(0,7); }
+function mesNome(m){ const [y,mm]=(m||mesAtual()).split('-').map(Number); return `${MESES[mm-1]}/${y}`; }
+function mesRows(){ const m=mesAtual(); return DATA.filter(filtroBase).filter(r=>isISO(r.prog)&&r.prog.slice(0,7)===m); }
+function renderMesSelect(){
+  const s=new Set(DATA.map(r=>r.prog).filter(isISO).map(d=>d.slice(0,7))); s.add(hojeISO().slice(0,7)); s.add(mesAtual());
+  const base=DATA.filter(filtroBase);
+  document.getElementById('fMes').innerHTML=[...s].sort().map(m=>{ const rs=base.filter(r=>isISO(r.prog)&&r.prog.slice(0,7)===m);
+    return `<option value="${m}" ${m===mesAtual()?'selected':''}>${mesNome(m).replace(/^./,c=>c.toUpperCase())} · ${rs.length} lanç. · ${brl(sum(rs))}</option>`; }).join('');
+}
+function renderPagoMes(){
+  renderMesSelect();
+  const m=mesAtual(), rows=mesRows();
+  const [y,mm]=m.split('-').map(Number), ini=`${m}-01`, fim=new Date(Date.UTC(y,mm,0)).toISOString().slice(0,10);
+  const sem=[]; for(let w=segundaDe(ini); w<=fim; w=addDias(w,7)) sem.push(w);
+  const ws=sem.map(w=>{ const r=rows.filter(x=>segundaDe(x.prog)===w); const p=sum(r), pg=sum(r.filter(isPago)), pu=sum(r.filter(isPagoUrg));
+    const a=w<ini?ini:w, b=addDias(w,4)>fim?fim:addDias(w,4); return {w,lab:`${fmtD(a).slice(0,5)} a ${fmtD(b).slice(0,5)}`,p,pg,pu,pct:p?pg/p*100:0}; });
+  drawChart('chPagoMes',{data:{labels:ws.map(x=>x.lab),datasets:[
+    {type:'bar',label:'Total programado',data:ws.map(x=>x.p),backgroundColor:'#0128a9',borderRadius:4,yAxisID:'y',order:2},
+    {type:'bar',label:'Total pago',data:ws.map(x=>x.pg),backgroundColor:'#15966a',borderRadius:4,yAxisID:'y',order:2},
+    {type:'bar',label:'Pago urgente',data:ws.map(x=>x.pu),backgroundColor:'#d43d3a',borderRadius:4,yAxisID:'y',order:2},
+    {type:'line',label:'% pago',data:ws.map(x=>x.pct),borderColor:'#e49a28',backgroundColor:'#e49a28',pointRadius:4,tension:.2,yAxisID:'y2',order:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},
+      tooltip:{callbacks:{title:c=>'Semana '+c[0].label,label:c=>c.dataset.yAxisID==='y2'?`% pago: ${c.parsed.y.toFixed(1).replace('.',',')}%`:`${c.dataset.label}: ${brl(c.parsed.y)}`}}},
+      onClick:(e,els)=>{ if(els.length){ setSemana(ws[els[0].index].w); diaSel='SEMANA'; render(); window.scrollTo({top:0,behavior:'smooth'}); } },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; },
+      scales:{y:{grid:{color:'#eef1f5'},ticks:{font:{size:10},callback:v=>v>=1000?(v/1000).toLocaleString('pt-BR')+' mil':v}},
+        y2:{position:'right',min:0,max:100,grid:{display:false},ticks:{font:{size:10},callback:v=>v+'%'}},x:{grid:{display:false},ticks:{font:{size:10}}}}}});
+  const p=sum(rows), pg=sum(rows.filter(isPago)), pu=sum(rows.filter(isPagoUrg)), qpu=rows.filter(isPagoUrg).length, falta=Math.max(p-pg,0), pct=p?pg/p*100:0;
+  const nA=rows.filter(r=>!isPago(r)).length, nP=rows.filter(isPago).length;
+  const box=(id,l,v,c,n)=>`<div class="click minicard" role="button" tabindex="0" onclick="abrirDetalhe('${id}')" onkeydown="if(event.key==='Enter')abrirDetalhe('${id}')" title="Clique para ver os lançamentos do mês" style="border:1px solid var(--line);border-left:4px solid ${c};border-radius:8px;padding:8px 10px;cursor:pointer"><div class="muted" style="font-size:10px;font-weight:700">${l} <span style="float:right;color:${c}">↗</span></div><div style="font-weight:800;font-size:15px">${v}</div><div class="muted" style="font-size:10px">📄 ${n} lançamento${n===1?'':'s'}</div></div>`;
+  document.getElementById('pagoResumoMes').innerHTML=box('pm_prog','Programado no mês',brl(p),'#0128a9',rows.length)+box('pm_pago','Pago no mês',brl(pg),'#15966a',nP)+box('pm_pagoUrg','Pago urgente',brl(pu)+` <span class="muted" style="font-size:10px;font-weight:400">· ${pg?(pu/pg*100).toFixed(1).replace('.',','):0}% do pago</span>`,'#d43d3a',qpu)+box('pm_apagar','A pagar',brl(falta),'#98a2b3',nA)+box('pm_pct','% pago no mês',pct.toFixed(1).replace('.',',')+'%','#e49a28',rows.length);
+  drawChart('chPagoMesPct',{type:'doughnut',data:{labels:['Pago (demais)','Pago urgente','A pagar'],datasets:[{data:[Math.max(pg-pu,0),pu,falta],backgroundColor:['#15966a','#d43d3a','#d0d5dd'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:c=>`${c.label}: ${brl(c.parsed)} (${p?(c.parsed/p*100).toFixed(1).replace('.',','):0}%)`}}}}});
+}
 function renderCharts(rows){
   renderPagoProg(rows);
+  renderPagoMes();
 }
 
 function renderReag(rows){
@@ -1354,6 +1407,7 @@ document.getElementById('detQ').addEventListener('input',()=>renderDet());
 document.getElementById('detOrd').addEventListener('change',()=>renderDet());
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ ['detModal','waModal','bkModal'].forEach(id=>{const m=document.getElementById(id); if(m&&m.style.display==='flex') m.style.display='none';}); DET=null; syncModal(); } });
 document.getElementById('fReagPara').addEventListener('change',()=>renderReag(filtered()));
+document.getElementById('fMes').addEventListener('change',e=>{ mesSel=e.target.value; renderPagoMes(); });
 document.getElementById('search').addEventListener('input',()=>renderMain(filtered()));
 let _gs; document.getElementById('gsearch').addEventListener('input',()=>{clearTimeout(_gs);_gs=setTimeout(render,250)});
 /* ============ BASE NO SERVIDOR (Vercel) ============ */
