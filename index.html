@@ -482,6 +482,10 @@ const isHoje     = r => r.sit.includes('VENCE HOJE');
 const isReag     = r => r.sit.includes('REAGEND') && !isPago(r);
 const isPagoUrg  = r => isPago(r) && (r.sit.includes('URG') || norm(r.ok)==='URG');
 const isPagoReag = r => isPago(r) && r.sit.includes('REAGEND');
+// juros interno (coluna Comentários) considera reagendados E urgentes (abertos ou pagos)
+const isJIntReag = r => r.sit.includes('REAGEND');
+const isJIntUrg  = r => !isJIntReag(r) && (r.sit.includes('URG') || norm(r.ok)==='URG');
+const isJInt     = r => isJIntReag(r) || isJIntUrg(r);
 function sitClass(s){ if(s.includes('PAGO')) return 'p-pago'; if(s.includes('URG')) return 'p-urg'; if(s.includes('HOJE')) return 'p-hoje'; if(s.includes('REAGEND')) return 'p-reag'; return 'p-other'; }
 const sum = arr => arr.reduce((a,r)=>a+(r.valor||0),0);
 function groupSum(arr,key){ const m={}; arr.forEach(r=>{const k=r[key]||'(sem informação)'; m[k]=(m[k]||0)+r.valor}); return Object.entries(m).sort((a,b)=>b[1]-a[1]); }
@@ -674,14 +678,14 @@ function detalheDef(id){
   const pm=id.startsWith('pm_'); if(pm) id='pp_'+id.slice(3);
   const rows=pm?mesRows():filtered(), I=indicadores(rows), k=kpis(rows);
   const reagPara={lab:'Reagendado para',fn:r=>r.reag?fmtD(r.reag):'Sem data'};
-  const jRe=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja);
+  const jRe=rows.filter(r=>isJInt(r)&&r.jLoja);
   const D={
     hoje:{t:`📅 A pagar ${nomeDia(I.D)==='hoje'?'hoje':'em '+fmtD(I.D)}`,rows:I.progDia,extra:{lab:'Pagar em',fn:r=>fmtD(edata(r))},desc:`Todos os lançamentos programados para ${fmtD(I.D)}: pagos + reagendados + em aberto.`},
     urg:{t:'🚨 Total urgente (aberto + pago)',rows:I.urg,extra:{lab:'Status',fn:r=>isPago(r)?'✅ Pago':'🚨 Em aberto'},desc:'Lançamentos urgentes em aberto (situação URGENTE) e urgentes já pagos. Clique numa loja do ranking para filtrar a lista.',memo:memoLojas(I.urg)},
     reag:{t:'🔄 Total reagendado',rows:I.reag,extra:reagPara,desc:'Lançamentos com situação REAGENDADO (não pagos). Clique numa loja do ranking para abrir o detalhe dela.',memo:memoLojas(I.reag,'Lojas que mais reagendamos',{cor:'#7257c9',bg:'#f8f6fe',borda:'#d9d0f5',rot:'Reagendado para',st:r=>r.reag?`<b style="color:#7257c9">${fmtD(r.reag)}</b>`:'<span class="muted">Sem data</span>',unid:'reagendamentos'})},
     pago:{t:'✅ Total pago',rows:I.pago,desc:'Lançamentos pagos no período (inclui pago urgente e pago/reagendamento).'},
     conc:{t:'⚖ Conciliação — a pagar × pago',rows:I.conc,extra:{lab:'Conciliação',fn:r=>isPago(r)?'✅ Pago':'⏳ A pagar'},desc:'Lançamentos que compõem a base da conciliação do dia.',memo:memoConciliacao(I)},
-    c_jint:{t:'💸 Juros interno (reagendados)',rows:jRe,extra:{lab:'Juros interno',fn:r=>brl(r.jLoja),num:true},extra2:reagPara,campo:'jLoja',desc:'Juros internos loja (coluna Comentários) dos lançamentos reagendados.'},
+    c_jint:{t:'💸 Juros interno (reagendados + urgentes)',rows:jRe,extra:{lab:'Juros interno',fn:r=>brl(r.jLoja),num:true},extra2:{lab:'Tipo',fn:r=>isJIntReag(r)?'🔄 Reagendado'+(r.reag?' p/ '+fmtD(r.reag):''):'🚨 Urgente'},campo:'jLoja',desc:'Juros internos loja (coluna Comentários) dos lançamentos reagendados e urgentes (abertos ou pagos).'},
     c_jger:{t:'💸 Juros gerentes',rows:rows.filter(r=>r.jGer),extra:{lab:'Juros gerentes',fn:r=>brl(r.jGer),num:true},campo:'jGer',desc:'Coluna Juros da planilha.'},
     pp_prog:{t:'Total programado',rows:rows,desc:'Todos os lançamentos do período e filtros.',memo:memoSitRows(rows,'Composição por situação')},
     pp_pago:{t:'✅ Pago',rows:rows.filter(isPago),desc:'Lançamentos pagos (inclui pago urgente e pago/reagendamento).'},
@@ -764,11 +768,11 @@ function kpis(rows){
 }
 function renderCards(rows){
   const k=kpis(rows);
-  const jRe=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja), jOut=rows.filter(r=>!r.sit.includes('REAGEND')&&r.jLoja);
+  const jRe=rows.filter(r=>isJInt(r)&&r.jLoja), jOut=rows.filter(r=>!isJInt(r)&&r.jLoja);
   const sj=a=>a.reduce((s,r)=>s+(r.jLoja||0),0);
   const c=(id,cls,l,v,s,n)=>`<div class="box card ${cls} click" role="button" tabindex="0" onclick="abrirDetalhe('${id}')" onkeydown="if(event.key==='Enter')abrirDetalhe('${id}')" title="Clique para ver os lançamentos"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${s}</div><div class="s" style="margin-top:6px;padding-top:6px;border-top:1px dashed #d6dce5;font-weight:700;color:var(--text)">📄 ${n} lançamento${n===1?'':'s'}</div></div>`;
   document.getElementById('cards').innerHTML=
-    c('c_jint','orange','💸 Juros interno (reagendados)',brl(sj(jRe)),`Coluna Comentários · reagendados${sj(jOut)?` · fora de reagendados: ${brl(sj(jOut))}`:''}`,jRe.length)+
+    c('c_jint','orange','💸 Juros interno (reagendados + urgentes)',brl(sj(jRe)),`Reagendados ${brl(sj(jRe.filter(isJIntReag)))} · urgentes ${brl(sj(jRe.filter(isJIntUrg)))}${sj(jOut)?` · demais: ${brl(sj(jOut))}`:''}`,jRe.length)+
     c('c_jger','orange','💸 Juros gerentes',brl(k.jGer),'Coluna Juros da planilha',k.qJGer)+
     c('c_medio','teal','📊 Valor médio por lançamento',brl(k.medio),`${brl(k.total)} ÷ ${k.qtd}`,k.qtd);
 }
@@ -1323,13 +1327,13 @@ async function gerarWhats(){
   // KPIs
   const lond = diaSel==='SEMANA' ? DIAS_SEMANA.filter(d=>DATA.some(r=>r.prog===d)).reduce((a,d)=>a+(+LOND[d]||0),0) : (+LOND[diaSel]||0);
   const pct=v=>k.total?(v/k.total*100).toFixed(1).replace('.',',')+'%':'0%';
-  const I6=indicadores(rows), sjR=rows.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0), nJR=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja).length;
+  const I6=indicadores(rows), sjR=rows.filter(isJInt).reduce((s,r)=>s+(r.jLoja||0),0), nJR=rows.filter(r=>isJInt(r)&&r.jLoja).length;
   const cards=[[`📅 A pagar ${nomeDia(I6.D)==='hoje'?'hoje':'em '+nomeDia(I6.D)}`,brl(sum(I6.progDia)),`📄 ${I6.progDia.length} lanç. · pago ${brl(sum(I6.progDia.filter(isPago)))} · reag. ${brl(sum(I6.progDia.filter(isReag)))}`,ORANGE],
     ['🚨 Total urgente',brl(sum(I6.urg)),`📄 ${I6.urg.length} lanç. · aberto ${brl(sum(I6.urg.filter(isUrg)))}`,RED],
     ['🔄 Total reagendado',brl(sum(I6.reag)),`📄 ${I6.reag.length} lançamentos`,PURPLE],
     ['✅ Total pago',brl(sum(I6.pago)),`📄 ${I6.pago.length} lançamentos`,GREEN],
     ['⚖ Conciliação a pagar × pago',pctBR(I6.pct),`📄 ${I6.conc.length} lanç. · pago ${brl(sum(I6.pagoDia))} ÷ a pagar ${brl(sum(I6.progDia))}`,I6.pct===null?'#667085':I6.pct>=100?GREEN:I6.pct>=50?ORANGE:RED],
-    ['💸 Juros interno (reagendados)',brl(sjR),`📄 ${nJR} lançamentos`,ORANGE],
+    ['💸 Juros interno (reagendados + urgentes)',brl(sjR),`📄 ${nJR} lançamentos`,ORANGE],
     ['💸 Juros gerentes',brl(k.jGer),`📄 ${k.qJGer} lançamentos`,ORANGE],
     ['📊 Valor médio por lançamento',brl(k.medio),`📄 ${k.qtd} lançamentos`,'#0f9aa0']];
   const cw=(W-2*P-16)/2, ch=104;
@@ -1409,7 +1413,7 @@ function resumoTexto(){
   t.push(`🚨 Urgentes: *${brl(sum(urg))}* (${urg.length} lanç.)`);
   t.push(`      🔴 em aberto ${brl(sum(urg.filter(isUrg)))} · 🟢 pagos ${brl(sum(urg.filter(isPagoUrg)))}`);
   t.push(`🔄 Reagendados: *${brl(sum(reag))}* (${reag.length} lanç.)`);
-  const jInt=dia.filter(r=>r.sit.includes('REAGEND')).reduce((s,r)=>s+(r.jLoja||0),0), jGer=dia.reduce((s,r)=>s+(r.jGer||0),0);
+  const jInt=dia.filter(isJInt).reduce((s,r)=>s+(r.jLoja||0),0), jGer=dia.reduce((s,r)=>s+(r.jGer||0),0);
   t.push(`💸 Juros: interno ${brl(jInt)} · gerentes ${brl(jGer)}`);
   const rm={}; reag.forEach(r=>{const x=r.reag||'SEM'; rm[x]=rm[x]||{n:0,v:0}; rm[x].n++; rm[x].v+=r.valor;});
   const rk=Object.keys(rm).sort((a,b)=>a==='SEM'?1:b==='SEM'?-1:a.localeCompare(b));
@@ -1444,7 +1448,7 @@ function exportExcel(){
   if(!window.XLSX){ toast('Leitor de planilhas indisponível (sem internet).'); return; }
   const rows=filtered(), k=kpis(rows), wb=XLSX.utils.book_new();
   const resumo=[['Painel Contas a Pagar'],['Período', diaSel==='SEMANA'?semanaTxt():fmtD(diaSel)],['Data de referência',fmtD(REF_DATE)],['Gerado em',new Date().toLocaleString('pt-BR')],[],
-    ['Indicador','Valor','Qtd'],...(()=>{const I=indicadores(rows);const jr=rows.filter(r=>r.sit.includes('REAGEND')&&r.jLoja);return [['Dia de referência',fmtD(I.D),''],[`A pagar (${fmtD(I.D)})`,sum(I.hoje),I.hoje.length],['Total urgente (aberto + pago)',sum(I.urg),I.urg.length],['Total reagendado',sum(I.reag),I.reag.length],['Total pago',sum(I.pago),I.pago.length],['Conciliação — base (a pagar + pago do dia)',sum(I.conc),I.conc.length],['Conciliação — pago do dia',sum(I.pagoDia),I.pagoDia.length],['Conciliação — % pago',I.pct===null?'':Math.round(I.pct*10)/10,''],[],['Juros interno (reagendados)',jr.reduce((s,r)=>s+(r.jLoja||0),0),jr.length],['Juros gerentes',k.jGer,k.qJGer],['Valor médio por lançamento',k.medio,k.qtd],[],['Total programado',k.total,k.qtd]];})()];
+    ['Indicador','Valor','Qtd'],...(()=>{const I=indicadores(rows);const jr=rows.filter(r=>isJInt(r)&&r.jLoja);return [['Dia de referência',fmtD(I.D),''],[`A pagar (${fmtD(I.D)})`,sum(I.hoje),I.hoje.length],['Total urgente (aberto + pago)',sum(I.urg),I.urg.length],['Total reagendado',sum(I.reag),I.reag.length],['Total pago',sum(I.pago),I.pago.length],['Conciliação — base (a pagar + pago do dia)',sum(I.conc),I.conc.length],['Conciliação — pago do dia',sum(I.pagoDia),I.pagoDia.length],['Conciliação — % pago',I.pct===null?'':Math.round(I.pct*10)/10,''],[],['Juros interno (reagendados + urgentes)',jr.reduce((s,r)=>s+(r.jLoja||0),0),jr.length],['Juros gerentes',k.jGer,k.qJGer],['Valor médio por lançamento',k.medio,k.qtd],[],['Total programado',k.total,k.qtd]];})()];
   const add=(name,aoa)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),name);
   add('Resumo',resumo);
   const conf=renderConfronto();
