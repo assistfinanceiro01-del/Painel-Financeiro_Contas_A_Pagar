@@ -337,6 +337,17 @@ mark{background:#fff3b0;padding:0 1px;border-radius:2px}
         <button class="bbtn sm" style="height:36px" onclick="exportTabela()">⬇ Exportar tabela filtrada</button>
       </div>
     </div>
+    <div id="lanWa" style="display:none;border:1px solid #bfe8cc;border-left:6px solid #25d366;border-radius:12px;background:#f3fbf5;padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <h4 style="margin:0;color:#075e54;font-size:14px">📝 Resumo para WhatsApp <span class="muted" style="font-weight:400;font-size:11px">— lançamentos da tabela (período e filtros atuais) · pode editar antes de enviar</span></h4>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="bbtn pri" style="margin:0;background:#25d366;border-color:#25d366" onclick="copiarLanWa()">📋 Copiar texto</button>
+          <button class="bbtn" style="margin:0;background:#075e54;border-color:#075e54;color:#fff" onclick="enviarLanWa()">💬 Enviar no WhatsApp</button>
+          <button class="bbtn" style="margin:0" onclick="fecharLanWa()" title="Esconder o resumo">✕</button>
+        </div>
+      </div>
+      <textarea id="lanWaTxt" rows="12" spellcheck="false" style="width:100%;box-sizing:border-box;border:1px solid #cfe9d6;border-radius:10px;padding:12px;font:13px/1.5 'Segoe UI',Arial,sans-serif;color:var(--text);background:#fff;resize:vertical"></textarea>
+    </div>
     <div class="tablewrap"><table id="tblMain"></table></div>
   </div>
 
@@ -1061,13 +1072,42 @@ function renderMainBody(rows){
   tb.innerHTML=list.map(r=>`<tr class="${isUrg(r)?'urgente':''}"><td><b>${hl(r.forn)}</b></td><td>${hl(r.desc)}</td><td>${esc(r.cc)}</td><td>${esc(r.plano)}</td><td>${hl(r.pdc)}</td>
    <td><span class="pill ${sitClass(r.sit)}">${isUrg(r)?'🚨 ':''}${esc(r.sit)}</span></td><td>${fmtD(r.prog)}</td><td>${r.reag?fmtD(r.reag):''}</td><td>${esc(r.banco)}</td><td>${esc(r.motivo)}</td><td class="num">${r.jLoja?brl(r.jLoja):''}</td><td class="num">${r.jGer?brl(r.jGer):''}</td><td class="num">${brl(r.valor)}</td></tr>`).join('')||'<tr><td colspan="13" class="muted" style="text-align:center;padding:20px">Nenhum lançamento para os filtros selecionados.</td></tr>';
   tf.innerHTML=`<tr><td colspan="10">${list.length} lançamentos${nf?` · ${nf} filtro(s) de coluna ativo(s)`:''}</td><td class="num">${brl(list.reduce((a,r)=>a+(r.jLoja||0),0))}</td><td class="num">${brl(list.reduce((a,r)=>a+(r.jGer||0),0))}</td><td class="num">${brl(sum(list))}</td></tr>`;
+  atualizarLanWa(list);
 }
 function limparColFiltros(){ Object.keys(COLF).forEach(k=>delete COLF[k]); renderMain(filtered()); }
 function exportTabela(){
   if(!window.XLSX){ toast('Leitor de planilhas indisponível.'); return; }
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(linhasExport(listaMain(filtered()))),'Lançamentos filtrados');
   XLSX.writeFile(wb,`lancamentos_filtrados_${periodoTxt()}.xlsx`);
+  lanWaOn=true; lanWaFechado=false; atualizarLanWa(); document.getElementById('lanWa').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
+/* ===== Resumo WhatsApp dos lançamentos da tabela (aparece ao filtrar período ou exportar) ===== */
+let lanWaOn=false, lanWaFechado=false;
+function textoLancamentos(list){
+  const L='━━━━━━━━━━━━━━━', P=lanPeriodo(), a=document.getElementById('lanIni').value, b=document.getElementById('lanFim').value;
+  const per=P?(isISO(a)&&isISO(b)?`${fmtD(a)} a ${fmtD(b)}`:isISO(a)?`a partir de ${fmtD(a)}`:`até ${fmtD(b)}`):periodoLabel();
+  const pc=(v,t)=>(t?v/t*100:0).toFixed(1).replace('.',',')+'%', tot=sum(list), pg=list.filter(isPago), ab=list.filter(r=>!isPago(r));
+  const t=['📊 *CONTAS A PAGAR — LANÇAMENTOS*','_Grupo Ragga_','',`📅 *Período: ${per}*`];
+  const fa=filtrosAtivos(); const q=document.getElementById('search').value.trim(); if(q) fa.push(`Busca tabela: "${q}"`);
+  const nf=Object.keys(COLF).length; if(nf) fa.push(`${nf} filtro(s) de coluna`);
+  if(fa.length) t.push(`🔎 _Filtros: ${fa.join(' · ')}_`);
+  t.push(L,`💰 *Total: ${brl(tot)}* (${list.length} lanç.)`,`✅ Pago: ${brl(sum(pg))} (${pg.length}) · ${pc(sum(pg),tot)}`,`⏳ A pagar: ${brl(sum(ab))} (${ab.length})`);
+  const pl={}; list.forEach(r=>{ const p=r.plano||'(sem plano)', d=r.pdc||'(sem PDC)'; pl[p]=pl[p]||{n:0,v:0,pdc:{}}; pl[p].n++; pl[p].v+=r.valor; pl[p].pdc[d]=pl[p].pdc[d]||{n:0,v:0}; pl[p].pdc[d].n++; pl[p].pdc[d].v+=r.valor; });
+  const ord=Object.entries(pl).sort((x,y)=>y[1].v-x[1].v);
+  if(ord.length){ t.push(L,'📂 *PLANO DE CONTAS › PDC DETALHADO*');
+    ord.forEach(([p,o])=>{ t.push('',`▪️ *${p} — ${brl(o.v)}* (${o.n}) · ${pc(o.v,tot)}`);
+      Object.entries(o.pdc).sort((x,y)=>y[1].v-x[1].v).forEach(([d,x])=>t.push(`      ▫️ ${d}: ${brl(x.v)} (${x.n})`)); }); }
+  t.push(L,'🔗 painel-financeirocontasapagar-hzl6.vercel.app');
+  return t.join('\n');
+}
+function atualizarLanWa(list){
+  const box=document.getElementById('lanWa'); if(!box) return;
+  const show=!lanWaFechado&&(lanWaOn||!!lanPeriodo()); box.style.display=show?'block':'none';
+  if(show) document.getElementById('lanWaTxt').value=textoLancamentos(list||listaMain(filtered()));
+}
+function fecharLanWa(){ lanWaFechado=true; lanWaOn=false; atualizarLanWa(); }
+async function copiarLanWa(){ const el=document.getElementById('lanWaTxt'); try{ await navigator.clipboard.writeText(el.value); }catch(e){ el.select(); document.execCommand('copy'); } toast('📋 Texto copiado! Abra a conversa no WhatsApp e aperte Ctrl+V.',6000); }
+function enviarLanWa(){ window.open('https://wa.me/?text='+encodeURIComponent(document.getElementById('lanWaTxt').value),'_blank'); }
 function sortBy(k){ sortMain = sortMain.k===k ? (sortMain.dir>0?{k,dir:-1}:{k:null,dir:1}) : {k,dir:k==='valor'?-1:1}; renderMain(filtered()); }
 
 function render(){
@@ -1435,7 +1475,7 @@ document.getElementById('fReagPara').addEventListener('change',()=>renderReag(fi
 document.getElementById('fMes').addEventListener('change',e=>{ mesSel=e.target.value; renderPagoMes(); });
 ['perIni','perFim'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{ perIni=document.getElementById('perIni').value; perFim=document.getElementById('perFim').value; if((perIni&&perFim)||(!perIni&&!perFim)) renderPagoMes(); }));
 document.getElementById('search').addEventListener('input',()=>renderMain(filtered()));
-['lanIni','lanFim'].forEach(id=>document.getElementById(id).addEventListener('change',()=>renderMain(filtered())));
+['lanIni','lanFim'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{ lanWaFechado=false; renderMain(filtered()); }));
 let _gs; document.getElementById('gsearch').addEventListener('input',()=>{clearTimeout(_gs);_gs=setTimeout(render,250)});
 /* ============ BASE NO SERVIDOR (Vercel) ============ */
 const API_BASE='/api/base';
