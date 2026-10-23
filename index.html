@@ -1092,6 +1092,10 @@ function textoLancamentos(list){
   const nf=Object.keys(COLF).length; if(nf) fa.push(`${nf} filtro(s) de coluna`);
   if(fa.length) t.push(`🔎 _Filtros: ${fa.join(' · ')}_`);
   t.push(L,`💰 *Total: ${brl(tot)}* (${list.length} lanç.)`,`✅ Pago: ${brl(sum(pg))} (${pg.length}) · ${pc(sum(pg),tot)}`,`⏳ A pagar: ${brl(sum(ab))} (${ab.length})`);
+  const lj={}; list.forEach(r=>{ const c=r.cc||'(sem loja)'; lj[c]=lj[c]||{n:0,v:0,pg:0}; lj[c].n++; lj[c].v+=r.valor; if(isPago(r)) lj[c].pg+=r.valor; });
+  const lord=Object.entries(lj).sort((x,y)=>y[1].v-x[1].v);
+  if(lord.length){ t.push(L,`🏪 *POR LOJA (CENTRO DE CUSTO)* — ${lord.length} loja${lord.length===1?'':'s'}`);
+    lord.forEach(([c,o])=>t.push(`▫️ *${c}*: ${brl(o.v)} (${o.n}) · ${pc(o.v,tot)}${o.pg<o.v-0.005?` · pago ${brl(o.pg)}`:' ✅'}`)); }
   const pl={}; list.forEach(r=>{ const p=r.plano||'(sem plano)', d=r.pdc||'(sem PDC)'; pl[p]=pl[p]||{n:0,v:0,pdc:{}}; pl[p].n++; pl[p].v+=r.valor; pl[p].pdc[d]=pl[p].pdc[d]||{n:0,v:0}; pl[p].pdc[d].n++; pl[p].pdc[d].v+=r.valor; });
   const ord=Object.entries(pl).sort((x,y)=>y[1].v-x[1].v);
   if(ord.length){ t.push(L,'📂 *PLANO DE CONTAS › PDC DETALHADO*');
