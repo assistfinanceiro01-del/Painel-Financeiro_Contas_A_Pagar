@@ -216,6 +216,18 @@ body.modal-open{overflow:hidden}
 @media(max-width:800px){.hright{align-items:flex-start}header h1{font-size:24px}.cards,.grid2{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.wrap{padding:12px}}
 @media print{header .actions,.filters,.tabs,.toast{display:none}body{background:#fff}.tablewrap{max-height:none}}
 mark{background:#fff3b0;padding:0 1px;border-radius:2px}
+.msbtn{text-align:left;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px;padding-right:18px!important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23667085'/%3E%3C/svg%3E") no-repeat right 6px center}
+.msbtn.on{background-color:#e9edfb}
+.mspop{position:fixed;z-index:60;width:300px;background:#fff;border:1px solid #c9d3f5;border-radius:10px;box-shadow:0 12px 30px rgba(1,40,169,.2);padding:8px;font-size:12px}
+.mspop .msq{width:100%;height:30px;border:1px solid #d6dce5;border-radius:6px;padding:0 8px;margin-bottom:6px;font-size:12px}
+.mspop .msacts{display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap}
+.mspop button{height:26px;border:1px solid #c9d3f5;border-radius:6px;background:var(--blue-soft);color:var(--brand);font-weight:700;font-size:11px;cursor:pointer;padding:0 8px}
+.mspop button.pri{background:var(--brand);color:#fff;border-color:var(--brand);width:100%;height:30px}
+.mspop .mslist{max-height:260px;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 0;margin-bottom:6px}
+.mspop label{display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;font-weight:400;color:var(--text);padding:4px;margin:0;cursor:pointer;border-radius:4px}
+.mspop label:hover{background:#f3f5fd}
+.mspop label span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mspop label i{font-style:normal;color:var(--muted);font-size:10.5px}
 .hright{gap:8px}
 .hweek{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:5px 8px}
 .hweek .hwl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;opacity:.9}
@@ -1028,10 +1040,13 @@ function setReagPara(label){ const v=label.startsWith('Sem')?'SEM':label.split('
 const COLS=[['forn','Fornecedor'],['desc','Descrição'],['cc','Centro de custo'],['plano','Plano'],['pdc','PDC detalhado'],['sit','Situação'],['prog','Data programação'],['reag','Reagendado p/'],['banco','Banco'],['motivo','Motivo urgente'],['jLoja','Juros loja'],['jGer','Juros gerentes'],['valor','Valor total']];
 function hl(s){ const q=document.getElementById('gsearch').value.trim(); const e=esc(s); if(!q||/^[\d.,\sR$]+$/.test(q)) return e; const i=norm(s).indexOf(norm(q)); if(i<0||norm(s).length!==String(s).length) return e; return esc(String(s).slice(0,i))+'<mark>'+esc(String(s).slice(i,i+q.length))+'</mark>'+esc(String(s).slice(i+q.length)); }
 const COLF={}; // filtros por coluna
-const COL_TEXTO=['desc','valor','jLoja','jGer'];
-function colVal(r,k){ if(k==='prog'||k==='reag') return r[k]?fmtD(r[k]):''; return String(r[k]??''); }
+const COL_TEXTO=['desc','valor'];
+const COL_NUM=['jLoja','jGer'];
+let MSOPTS={}; // opções dos filtros de seleção múltipla, por coluna
+function colVal(r,k){ if(k==='prog'||k==='reag') return r[k]?fmtD(r[k]):''; if(COL_NUM.includes(k)) return r[k]?brl(+r[k]):''; return String(r[k]??''); }
 function casaCol(r,k,v){
   if(v===undefined||v==='') return true;
+  if(Array.isArray(v)){ if(!v.length) return true; const x=colVal(r,k); return v.includes(x===''?'__VAZIO__':x); }
   if(k==='valor'||k==='jLoja'||k==='jGer'){ const x=+r[k]||0; const s=v.replace(/\s/g,''); const m=/^(>=|<=|>|<)?(.+)$/.exec(s); const n=parseNum(m[2]); if(m[1]&&!isNaN(n)){ return m[1]==='>'?x>n:m[1]==='<'?x<n:m[1]==='>='?x>=n:x<=n; }
     return casaBusca({forn:'',pdc:'',desc:'',valor:x},norm(s)); }
   if(COL_TEXTO.includes(k)) return norm(colVal(r,k)).includes(norm(v));
@@ -1045,8 +1060,33 @@ function listaMainBase(rows){
   const q=norm(document.getElementById('search').value); return rows.filter(r=>!q||norm([r.forn,r.desc,r.banco,r.cc,r.pdc,r.motivo].join(' ')).includes(q));
 }
 function limparLanPeriodo(){ document.getElementById('lanIni').value=''; document.getElementById('lanFim').value=''; renderMain(filtered()); }
+/* ===== filtro de seleção múltipla nas colunas da tabela ===== */
+function fecharMs(){ const p=document.getElementById('msPop'); if(p) p.remove(); }
+function abrirMs(ev,k){
+  ev.stopPropagation(); const aberto=document.getElementById('msPop'); fecharMs(); if(aberto&&aberto.dataset.k===k) return;
+  const b=ev.currentTarget.getBoundingClientRect(), opts=MSOPTS[k]||[], num=COL_NUM.includes(k);
+  const sel=new Set(Array.isArray(COLF[k])?COLF[k]:(COLF[k]?[COLF[k]]:opts.map(o=>o.v)));
+  const p=document.createElement('div'); p.id='msPop'; p.className='mspop'; p.dataset.k=k;
+  p.style.left=Math.max(8,Math.min(b.left,innerWidth-310))+'px'; p.style.top=Math.min(b.bottom+4,innerHeight-380)+'px';
+  p.innerHTML=`<input type="text" class="msq" placeholder="Buscar na lista…"><div class="msacts"><button type="button" data-a="all">✓ Todos</button>${num?'<button type="button" data-a="val">Só com valor</button>':''}<button type="button" data-a="none">✕ Nenhum</button></div>
+    <div class="mslist">${opts.map(o=>`<label><input type="checkbox" value="${esc(o.v)}" ${sel.has(o.v)?'checked':''}><span title="${esc(o.lab)}">${esc(o.lab)}</span><i>${o.n}</i></label>`).join('')||'<div class="muted" style="padding:6px">Sem valores.</div>'}</div>
+    <button type="button" data-a="ok" class="pri">Aplicar filtro</button>`;
+  document.body.appendChild(p);
+  const boxes=()=>[...p.querySelectorAll('.mslist label')].filter(l=>l.style.display!=='none').map(l=>l.querySelector('input'));
+  p.querySelector('.msq').addEventListener('input',e=>{ const q=norm(e.target.value); p.querySelectorAll('.mslist label').forEach(l=>{ l.style.display=!q||norm(l.textContent).includes(q)?'':'none'; }); });
+  p.addEventListener('click',e=>{ const a=e.target.dataset&&e.target.dataset.a; if(!a) return;
+    if(a==='all') boxes().forEach(c=>c.checked=true);
+    if(a==='none') boxes().forEach(c=>c.checked=false);
+    if(a==='val') boxes().forEach(c=>c.checked=c.value!=='__VAZIO__');
+    if(a==='ok'){ const ch=[...p.querySelectorAll('.mslist input:checked')].map(c=>c.value);
+      if(!ch.length||ch.length===opts.length) delete COLF[k]; else COLF[k]=ch;
+      fecharMs(); renderMain(filtered()); } });
+  p.querySelector('.msq').focus();
+}
+document.addEventListener('mousedown',e=>{ const p=document.getElementById('msPop'); if(p&&!p.contains(e.target)&&!e.target.classList.contains('msbtn')) fecharMs(); });
+window.addEventListener('scroll',e=>{ const p=document.getElementById('msPop'); if(p&&!p.contains(e.target)) fecharMs(); },true);
 function renderMain(rows){
-  const base=listaMainBase(rows);
+  const base=listaMainBase(rows); MSOPTS={};
   const filtroCel=([k,l])=>{
     const v=COLF[k]||'';
     if(COL_TEXTO.includes(k)) return `<th><input class="cf ${v?'on':''}" data-k="${k}" value="${esc(v)}" placeholder="${k==='valor'?'ex.: 340 · >1000':k==='desc'?'contém…':'ex.: >0'}"></th>`;
@@ -1054,9 +1094,14 @@ function renderMain(rows){
     opts.forEach(r=>{const x=colVal(r,k); cnt[x]=(cnt[x]||0)+1;});
     let vals=Object.keys(cnt);
     if(k==='prog'||k==='reag') vals.sort((a,b)=>a===''?1:b===''?-1:a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join('')));
+    else if(COL_NUM.includes(k)) vals.sort((a,b)=>a===''?1:b===''?-1:parseNum(b)-parseNum(a));
     else vals.sort((a,b)=>a===''?1:b===''?-1:a.localeCompare(b,'pt-BR'));
-    if(v && v!=='__VAZIO__' && !vals.includes(v)) vals.unshift(v);
-    return `<th><select class="cf ${v?'on':''}" data-k="${k}"><option value="">Todos</option>${vals.map(x=>x===''?`<option value="__VAZIO__" ${v==='__VAZIO__'?'selected':''}>(vazio) (${cnt['']||0})</option>`:`<option value="${esc(x)}" ${v===x?'selected':''}>${esc(x.length>45?x.slice(0,44)+'…':x)} (${cnt[x]||0})</option>`).join('')}</select></th>`;
+    const sel=Array.isArray(v)?v:(v?[v]:[]);
+    sel.forEach(s=>{ const x=s==='__VAZIO__'?'':s; if(!vals.includes(x)){ vals.unshift(x); cnt[x]=0; } });
+    MSOPTS[k]=vals.map(x=>({v:x===''?'__VAZIO__':x,lab:x===''?'(vazio)':x,n:cnt[x]||0}));
+    const lab=s=>s==='__VAZIO__'?'(vazio)':s;
+    const txt=!sel.length?'Todos':sel.length===1?lab(sel[0]):`${sel.length} selecionados`;
+    return `<th><button type="button" class="cf msbtn ${sel.length?'on':''}" data-k="${k}" onclick="abrirMs(event,'${k}')" title="${esc(sel.length?sel.map(lab).join(' · '):'Todos — clique para escolher um ou mais')}">${esc(txt)}</button></th>`;
   };
   document.getElementById('tblMain').innerHTML=`<thead><tr>${COLS.map(([k,l])=>`<th class="${['valor','jLoja','jGer'].includes(k)?'num':''}" onclick="sortBy('${k}')">${l}${COLF[k]?' 🔽':''}${sortMain.k===k?(sortMain.dir>0?' ▲':' ▼'):''}</th>`).join('')}</tr>
    <tr class="frow">${COLS.map(filtroCel).join('')}</tr></thead><tbody></tbody><tfoot></tfoot>`;
